@@ -32,3 +32,14 @@ The system is packaged with Docker Compose and includes:
 ```bash
 git clone https://github.com/<your-org>/CacheBridgeAPI.git
 cd CacheBridgeAPI
+2. Environment variables (⚠️ required)
+
+This project requires a .env file to run. An example is provided as .env.example.
+
+⚠️ VERY IMPORTANT
+
+Do not commit your .env file to GitHub.
+
+Always add .env to your .gitignore.
+
+Only .env.example should be committed (with placeholder values).
