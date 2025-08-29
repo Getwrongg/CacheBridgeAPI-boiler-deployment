@@ -2,13 +2,14 @@ import express from "express";
 import cors from "cors";
 import { MongoClient, ObjectId } from "mongodb";
 import Redis from "ioredis";
+import { recordHit, recordMiss, recordRequest, getStats } from "./statistics.js";
 
 const app = express();
 app.use(express.json());
 
 // enable CORS for console frontend
 app.use(cors({
-    origin: "http://localhost:4000" // adjust if console served elsewhere
+    origin: "http://localhost:4000"
 }));
 
 // Load env vars
@@ -23,9 +24,11 @@ const redis = new Redis(REDIS_URL);
 
 let users;
 
-// Cache hit/miss counters
-let cacheHits = 0;
-let cacheMisses = 0;
+// Middleware: count requests
+app.use((req, res, next) => {
+    recordRequest();
+    next();
+});
 
 // Connect Mongo before starting server
 async function init() {
@@ -63,20 +66,17 @@ app.get("/users/:id", async (req, res) => {
     const cacheKey = `user:${userId}`;
 
     try {
-        // 1. Try Redis
         const cached = await redis.get(cacheKey);
         if (cached) {
-            cacheHits++;
+            recordHit();
             return res.json({ ...JSON.parse(cached), source: "cache" });
         }
 
-        // 2. Fallback to Mongo
         const user = await users.findOne({ _id: new ObjectId(userId) });
         if (!user) return res.status(404).json({ error: "User not found" });
 
-        // 3. Store in Redis with TTL
         await redis.setex(cacheKey, 60, JSON.stringify(user)); // 60s TTL
-        cacheMisses++;
+        recordMiss();
 
         res.json({ ...user, source: "mongo" });
     } catch (err) {
@@ -92,14 +92,14 @@ app.get("/users", async (req, res) => {
     try {
         const cached = await redis.get(cacheKey);
         if (cached) {
-            cacheHits++;
+            recordHit();
             return res.json({ users: JSON.parse(cached), source: "cache" });
         }
 
         const allUsers = await users.find().toArray();
 
-        await redis.setex(cacheKey, 60, JSON.stringify(allUsers)); // 60s TTL
-        cacheMisses++;
+        await redis.setex(cacheKey, 60, JSON.stringify(allUsers));
+        recordMiss();
 
         res.json({ users: allUsers, source: "mongo" });
     } catch (err) {
@@ -143,12 +143,40 @@ app.get("/health", async (req, res) => {
     }
 });
 
-// Metrics endpoint
-app.get("/metrics", (req, res) => {
-    res.json({
-        hits: cacheHits,
-        misses: cacheMisses
-    });
+// Metrics endpoint (extended)
+app.get("/metrics", async (req, res) => {
+    try {
+        const stats = getStats();
+
+        // Redis memory usage
+        const memoryInfo = await redis.info("memory");
+        const usedMemoryMatch = memoryInfo.match(/used_memory_human:(\S+)/);
+        const usedMemory = usedMemoryMatch ? usedMemoryMatch[1] : "unknown";
+
+        // Approximate TTL check
+        const keys = await redis.keys("*");
+        let totalTTL = 0;
+        let ttlCount = 0;
+
+        for (const key of keys.slice(0, 50)) {
+            const ttl = await redis.ttl(key);
+            if (ttl > 0) {
+                totalTTL += ttl;
+                ttlCount++;
+            }
+        }
+
+        const avgTTL = ttlCount > 0 ? (totalTTL / ttlCount) : 0;
+
+        res.json({
+            ...stats,
+            redisMemory: usedMemory,
+            avgTTL: avgTTL
+        });
+    } catch (err) {
+        console.error("Metrics error:", err);
+        res.status(500).json({ error: "Failed to fetch metrics" });
+    }
 });
 
 init().catch((err) => {

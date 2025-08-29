@@ -3,9 +3,15 @@ const API_BASE = "http://localhost:4001";
 const apiStatusEl = document.getElementById("api-status");
 const mongoStatusEl = document.getElementById("mongo-status");
 const redisStatusEl = document.getElementById("redis-status");
+
 const hitsEl = document.getElementById("cache-hits");
 const missesEl = document.getElementById("cache-misses");
 const ratioEl = document.getElementById("cache-ratio");
+
+const requestCountEl = document.getElementById("request-count");
+const redisMemoryEl = document.getElementById("redis-memory");
+const avgTTLEl = document.getElementById("avg-ttl");
+
 const clearBtn = document.getElementById("clear-cache");
 
 // Fetch health
@@ -28,14 +34,22 @@ async function fetchMetrics() {
     try {
         const res = await fetch(`${API_BASE}/metrics`);
         const data = await res.json();
+
         hitsEl.textContent = `Cache Hits: ${data.hits}`;
         missesEl.textContent = `Cache Misses: ${data.misses}`;
         const ratio = data.hits + data.misses > 0 ? (data.hits / (data.hits + data.misses)) * 100 : 0;
         ratioEl.textContent = `Hit Ratio: ${ratio.toFixed(1)}%`;
+
+        requestCountEl.textContent = `API Requests: ${data.requests}`;
+        redisMemoryEl.textContent = `Redis Memory: ${data.redisMemory}`;
+        avgTTLEl.textContent = `Avg TTL: ${data.avgTTL.toFixed(1)}s`;
     } catch {
         hitsEl.textContent = "Cache Hits: Error";
         missesEl.textContent = "Cache Misses: Error";
         ratioEl.textContent = "Hit Ratio: Error";
+        requestCountEl.textContent = "API Requests: Error";
+        redisMemoryEl.textContent = "Redis Memory: Error";
+        avgTTLEl.textContent = "Avg TTL: Error";
     }
 }
 
