@@ -1,9 +1,15 @@
 import express from "express";
+import cors from "cors";
 import { MongoClient, ObjectId } from "mongodb";
 import Redis from "ioredis";
 
 const app = express();
 app.use(express.json());
+
+// enable CORS for console frontend
+app.use(cors({
+    origin: "http://localhost:4000" // adjust if console served elsewhere
+}));
 
 // Load env vars
 const PORT = process.env.PORT || 4001;
@@ -16,6 +22,10 @@ const mongoClient = new MongoClient(MONGO_URI);
 const redis = new Redis(REDIS_URL);
 
 let users;
+
+// Cache hit/miss counters
+let cacheHits = 0;
+let cacheMisses = 0;
 
 // Connect Mongo before starting server
 async function init() {
@@ -56,6 +66,7 @@ app.get("/users/:id", async (req, res) => {
         // 1. Try Redis
         const cached = await redis.get(cacheKey);
         if (cached) {
+            cacheHits++;
             return res.json({ ...JSON.parse(cached), source: "cache" });
         }
 
@@ -65,6 +76,7 @@ app.get("/users/:id", async (req, res) => {
 
         // 3. Store in Redis with TTL
         await redis.setex(cacheKey, 60, JSON.stringify(user)); // 60s TTL
+        cacheMisses++;
 
         res.json({ ...user, source: "mongo" });
     } catch (err) {
@@ -80,12 +92,14 @@ app.get("/users", async (req, res) => {
     try {
         const cached = await redis.get(cacheKey);
         if (cached) {
+            cacheHits++;
             return res.json({ users: JSON.parse(cached), source: "cache" });
         }
 
         const allUsers = await users.find().toArray();
 
         await redis.setex(cacheKey, 60, JSON.stringify(allUsers)); // 60s TTL
+        cacheMisses++;
 
         res.json({ users: allUsers, source: "mongo" });
     } catch (err) {
@@ -94,7 +108,7 @@ app.get("/users", async (req, res) => {
     }
 });
 
-
+// Clear cache
 app.delete("/cache/clear", async (req, res) => {
     try {
         await redis.flushall();
@@ -105,6 +119,37 @@ app.delete("/cache/clear", async (req, res) => {
     }
 });
 
+// Health check
+app.get("/health", async (req, res) => {
+    const start = Date.now();
+    try {
+        const mongoCount = await users.countDocuments();
+        const redisKeys = await redis.dbsize();
+        const latency = Date.now() - start;
+
+        res.json({
+            api: { status: "online", latency },
+            mongo: { status: "online", docs: mongoCount },
+            redis: { status: "online", keys: redisKeys }
+        });
+    } catch (err) {
+        console.error("Health check error:", err);
+        res.status(500).json({
+            api: { status: "error" },
+            mongo: { status: "unknown" },
+            redis: { status: "unknown" },
+            error: err.message
+        });
+    }
+});
+
+// Metrics endpoint
+app.get("/metrics", (req, res) => {
+    res.json({
+        hits: cacheHits,
+        misses: cacheMisses
+    });
+});
 
 init().catch((err) => {
     console.error("Startup error:", err);

@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
-VisualStudioVersion = 17.14.36202.13 d17.14
+VisualStudioVersion = 17.14.36202.13
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{54A90642-561A-4BB1-A94E-469ADEE60C69}") = "CacheBridgeAPI", "CacheBridgeAPI\CacheBridgeAPI.esproj", "{0C2679D0-E763-DBCF-5581-9BA52A17E103}"
 EndProject
@@ -9,6 +9,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "deployment", "deployment", 
 	ProjectSection(SolutionItems) = preProject
 		.env = .env
 		docker-compose.yml = docker-compose.yml
+		setup.txt = setup.txt
 	EndProjectSection
 EndProject
 Project("{54A90642-561A-4BB1-A94E-469ADEE60C69}") = "CacheBridgeConsole", "CacheBridgeConsole\CacheBridgeConsole.esproj", "{22C80708-02B7-2DC1-DB8C-E79F83EC3C8E}"

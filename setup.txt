@@ -1,0 +1,11 @@
+
+
+docker compose up -d --build
+
+
+docker compose build cachebridge-console
+docker compose up -d cachebridge-console
+
+
+docker compose build --build cachebridge-api
+docker compose up -d --build cachebridge-api

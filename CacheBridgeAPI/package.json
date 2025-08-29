@@ -13,6 +13,7 @@
     "eslint": "^9.34.0"
   },
   "dependencies": {
+    "cors": "^2.8.5",
     "express": "^5.1.0",
     "ioredis": "^5.7.0",
     "mongodb": "^6.19.0"
